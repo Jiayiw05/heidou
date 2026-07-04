@@ -1,0 +1,85 @@
+# 依赖
+node_modules/
+*/node_modules/
+
+# 构建输出
+dist/
+build/
+*/dist/
+*/build/
+
+# 环境变量
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 日志
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# 运行时数据
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# 覆盖率目录
+coverage/
+*.lcov
+
+# nyc测试覆盖率
+.nyc_output
+
+# IDE和编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 操作系统
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# TypeScript
+*.tsbuildinfo
+
+# 可选的npm缓存目录
+.npm
+
+# 可选的eslint缓存
+.eslintcache
+
+# 微调缓存
+.cache
+.parcel-cache
+
+# Next.js构建输出
+.next
+
+# Nuxt.js构建/生成输出
+.nuxt
+
+# Gatsby文件
+.cache/
+public
+
+# Storybook构建输出
+.out
+.storybook-out
+
+# 临时文件夹
+tmp/
+temp/
+
+# Claude相关
+.claude/

@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: meeting-assistant
+    env: node
+    rootDir: backend
+    buildCommand: npm install && cd ../frontend && npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3001"
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_BASE_URL
+        value: https://api.deepseek.com/v1
+      - key: AI_MODEL
+        value: deepseek-chat
