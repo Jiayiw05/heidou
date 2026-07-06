@@ -3,6 +3,7 @@ import { useMeeting } from '../contexts/MeetingContext';
 import { MainButton } from './MainButton';
 import { Trash2, FileText, Download } from 'lucide-react';
 import { exportMeeting } from '../utils/exportMeeting';
+import { isEmbedded } from '../utils/postMessage';
 
 export const ControlPanel: React.FC = () => {
   const { isActive, startSession, endSession, clearHistory, analyzeMeeting, messages } = useMeeting();
@@ -49,7 +50,7 @@ export const ControlPanel: React.FC = () => {
           disabled={messages.length === 0}
           className="flex items-center space-x-2 px-3 py-2 text-gray-text hover:text-white transition-colors
                      disabled:opacity-30 disabled:cursor-not-allowed"
-          title="导出会议记录"
+          title={isEmbedded() ? '发送会议记录到父页面' : '导出会议记录'}
         >
           <Download className="w-4 h-4" />
           <span className="text-sm text-nowrap">导出</span>

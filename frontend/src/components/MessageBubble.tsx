@@ -1,14 +1,18 @@
 import React from 'react';
 import { Message } from '../contexts/MeetingContext';
 import { User, Bot, Info, Download } from 'lucide-react';
+import { isEmbedded, sendToParent } from '../utils/postMessage';
 
 interface MessageBubbleProps {
   message: Message;
 }
 
-const exportSingleMessage = (message: Message) => {
+/**
+ * 构建单条消息的文本内容
+ */
+const buildSingleMessageContent = (message: Message): string => {
   const timestamp = new Date(message.timestamp).toLocaleString('zh-CN');
-  const content = [
+  return [
     '═══════════════════════════════════',
     '  会议小参谋 - 会议记录（单条）',
     `  时间: ${timestamp}`,
@@ -18,16 +22,48 @@ const exportSingleMessage = (message: Message) => {
     '',
     '═══════════════════════════════════',
   ].join('\n');
+};
 
+/**
+ * 触发单条消息的浏览器下载
+ */
+const triggerSingleDownload = (content: string, filename: string): void => {
   const blob = new Blob(['﻿' + content], { type: 'text/plain;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `会议记录_${message.id}.txt`;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+};
+
+/**
+ * 导出单条消息
+ *
+ * - 嵌入 iframe 模式：通过 postMessage 发送给父页面
+ * - 独立模式：触发浏览器下载
+ */
+const exportSingleMessage = (message: Message): void => {
+  const content = buildSingleMessageContent(message);
+  const filename = `会议记录_${message.id}.txt`;
+
+  if (isEmbedded()) {
+    sendToParent({
+      source: 'meeting-assistant',
+      version: '1.0',
+      type: 'SINGLE_MESSAGE_EXPORT',
+      timestamp: Date.now(),
+      data: {
+        content,
+        filename,
+        messageId: message.id,
+      },
+    });
+  } else {
+    triggerSingleDownload(content, filename);
+  }
 };
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
@@ -82,7 +118,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
                 onClick={() => exportSingleMessage(message)}
                 className="opacity-0 group-hover:opacity-100 transition-opacity
                            text-gray-text hover:text-white p-1 rounded"
-                title="导出此条"
+                title={isEmbedded() ? '发送到父页面' : '导出此条'}
               >
                 <Download className="w-3.5 h-3.5" />
               </button>

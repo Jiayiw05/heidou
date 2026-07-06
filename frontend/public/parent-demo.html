@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>会议小参谋 - 父页面集成演示</title>
+  <style>
+    :root {
+      --bg: #f5f5f5;
+      --sidebar-bg: #1e1e2e;
+      --card-bg: #ffffff;
+      --text: #1a1a2e;
+      --text-muted: #6b7280;
+      --accent: #7c3aed;
+      --accent-hover: #6d28d9;
+      --border: #e5e7eb;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --radius: 8px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+    }
+
+    /* ── 左侧历史面板 ── */
+    .sidebar {
+      width: 360px;
+      min-width: 360px;
+      background: var(--sidebar-bg);
+      color: #e0e0e0;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .sidebar-header {
+      padding: 20px 24px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .sidebar-header h2 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .sidebar-header .subtitle {
+      font-size: 12px;
+      color: #9ca3af;
+      margin-top: 4px;
+    }
+
+    .sidebar-stats {
+      display: flex;
+      gap: 16px;
+      padding: 12px 24px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      font-size: 12px;
+      color: #9ca3af;
+    }
+
+    .sidebar-stats span strong {
+      color: #e0e0e0;
+    }
+
+    .history-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 12px;
+    }
+
+    .history-item {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .history-item:hover {
+      background: rgba(255,255,255,0.1);
+      border-color: rgba(255,255,255,0.15);
+    }
+
+    .history-item.active {
+      border-color: var(--accent);
+      background: rgba(124,58,237,0.15);
+    }
+
+    .history-item .type-badge {
+      display: inline-block;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-bottom: 6px;
+    }
+
+    .type-badge.full { background: rgba(16,185,129,0.2); color: var(--success); }
+    .type-badge.single { background: rgba(245,158,11,0.2); color: var(--warning); }
+
+    .history-item .meta {
+      font-size: 11px;
+      color: #6b7280;
+      margin-bottom: 4px;
+    }
+
+    .history-item .preview {
+      font-size: 12px;
+      color: #9ca3af;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .sidebar-footer {
+      padding: 12px 24px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+      display: flex;
+      gap: 8px;
+    }
+
+    .sidebar-footer button {
+      flex: 1;
+      padding: 8px 12px;
+      font-size: 12px;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: var(--radius);
+      background: transparent;
+      color: #e0e0e0;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .sidebar-footer button:hover {
+      background: rgba(255,255,255,0.08);
+    }
+
+    .sidebar-footer button.danger {
+      color: #ef4444;
+      border-color: rgba(239,68,68,0.3);
+    }
+
+    .sidebar-footer button.danger:hover {
+      background: rgba(239,68,68,0.1);
+    }
+
+    /* ── 右侧主区域 ── */
+    .main-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    .main-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 24px;
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .main-toolbar h3 {
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .status-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 6px;
+    }
+
+    .status-dot.disconnected { background: #9ca3af; }
+    .status-dot.connected { background: var(--success); }
+    .status-dot.ready { background: var(--accent); }
+
+    .iframe-container {
+      flex: 1;
+      position: relative;
+      background: #1a1a2e;
+    }
+
+    .iframe-container iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+
+    /* ── 内容预览模态框 ── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+
+    .modal-overlay.hidden { display: none; }
+
+    .modal {
+      background: var(--card-bg);
+      border-radius: 12px;
+      width: 90%;
+      max-width: 700px;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .modal-header h3 {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .modal-header button {
+      padding: 4px 12px;
+      font-size: 13px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .modal-header button:hover {
+      background: var(--bg);
+    }
+
+    .modal-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+    }
+
+    .modal-body pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--text);
+    }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: #6b7280;
+      text-align: center;
+      padding: 40px;
+    }
+
+    .empty-state .icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+      opacity: 0.3;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #1e1e2e;
+      color: #fff;
+      padding: 12px 20px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      z-index: 200;
+      opacity: 0;
+      transform: translateY(12px);
+      transition: all 0.3s;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ━━━━━━━━━━ 左侧历史面板 ━━━━━━━━━━ -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h2>📋 会议记录历史</h2>
+      <p class="subtitle">从嵌入的会议小参谋自动接收</p>
+    </div>
+
+    <div class="sidebar-stats">
+      <span>总计 <strong id="totalCount">0</strong> 条</span>
+      <span>全部导出 <strong id="fullCount">0</strong> 条</span>
+      <span>单条导出 <strong id="singleCount">0</strong> 条</span>
+    </div>
+
+    <div class="history-list" id="historyList">
+      <div class="empty-state">
+        <div class="icon">📭</div>
+        <p style="color:#9ca3af;">暂无历史记录</p>
+        <p style="font-size:12px;margin-top:4px;color:#6b7280;">
+          在右侧会议小参谋中导出会议记录，<br>内容将自动发送并保存在这里
+        </p>
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <button onclick="downloadSelected()" title="下载选中的记录">💾 下载选中</button>
+      <button onclick="exportAllHistory()" title="导出全部历史">📦 全部导出</button>
+      <button class="danger" onclick="clearAllHistory()">🗑 清空历史</button>
+    </div>
+  </aside>
+
+  <!-- ━━━━━━━━━━ 右侧主区域 ━━━━━━━━━━ -->
+  <main class="main-area">
+    <div class="main-toolbar">
+      <h3>
+        <span class="status-dot disconnected" id="statusDot"></span>
+        <span id="statusText">等待连接...</span>
+      </h3>
+      <div style="display: flex; gap: 8px;">
+        <label style="font-size:12px; color: var(--text-muted); display: flex; align-items: center; gap: 4px;">
+          iframe URL:
+          <input id="iframeUrl"
+                 type="text"
+                 value="http://localhost:3000"
+                 style="padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 12px; width: 220px;" />
+        </label>
+        <button onclick="reloadIframe()" style="padding: 4px 12px; font-size: 12px; border: 1px solid var(--border); border-radius: 4px; background: var(--card-bg); cursor: pointer;">
+          🔄 重载
+        </button>
+      </div>
+    </div>
+
+    <div class="iframe-container">
+      <iframe id="meetingFrame"
+              src="http://localhost:3000"
+              allow="microphone; camera"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals">
+      </iframe>
+    </div>
+  </main>
+
+  <!-- ━━━━━━━━━━ 内容预览模态框 ━━━━━━━━━━ -->
+  <div class="modal-overlay hidden" id="modalOverlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modalTitle">会议记录</h3>
+        <div style="display: flex; gap: 8px;">
+          <button onclick="downloadCurrentPreview()">💾 下载</button>
+          <button onclick="closeModal()">✕ 关闭</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <pre id="modalContent"></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- ━━━━━━━━━━ Toast ━━━━━━━━━━ -->
+  <div class="toast" id="toast"></div>
+
+  <!-- ━━━━━━━━━━ 脚本 ━━━━━━━━━━ -->
+  <script>
+    // ═══════════════════════════════════════════════════════════
+    //  存储 key 常量
+    // ═══════════════════════════════════════════════════════════
+    const STORAGE_KEY = 'meeting_assistant_history';
+
+    // ═══════════════════════════════════════════════════════════
+    //  历史记录管理（localStorage）
+    // ═══════════════════════════════════════════════════════════
+    function getHistory() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+      } catch {
+        return [];
+      }
+    }
+
+    function saveHistory(records) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+      } catch (e) {
+        showToast('⚠️ 存储空间不足，请清理旧记录');
+        console.error('localStorage 写入失败:', e);
+      }
+    }
+
+    /**
+     * 将收到的会议记录存入历史
+     */
+    function addRecord(payload) {
+      const records = getHistory();
+      const record = {
+        id: generateId(),
+        type: payload.type,
+        receivedAt: new Date().toISOString(),
+        timestamp: payload.timestamp,
+        filename: payload.data.filename || '未命名.txt',
+        content: payload.data.content || '',
+        messageId: payload.data.messageId || null,
+        messageCount: payload.data.messageCount || null,
+      };
+      records.unshift(record);
+      saveHistory(records);
+      renderHistoryList();
+      updateStats();
+      showToast('✅ 收到新的会议记录');
+    }
+
+    function generateId() {
+      return 'rec_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+    }
+
+    function deleteRecord(id) {
+      const records = getHistory().filter(r => r.id !== id);
+      saveHistory(records);
+      renderHistoryList();
+      updateStats();
+      showToast('🗑 记录已删除');
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  渲染历史列表
+    // ═══════════════════════════════════════════════════════════
+    let selectedRecordId = null;
+
+    function renderHistoryList() {
+      const records = getHistory();
+      const container = document.getElementById('historyList');
+
+      if (records.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="icon">📭</div>
+            <p style="color:#9ca3af;">暂无历史记录</p>
+            <p style="font-size:12px;margin-top:4px;color:#6b7280;">
+              在右侧会议小参谋中导出会议记录，<br>内容将自动发送并保存在这里
+            </p>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = records.map(r => {
+        const isFull = r.type === 'MEETING_EXPORT';
+        const badgeClass = isFull ? 'full' : 'single';
+        const badgeText = isFull
+          ? (r.messageCount ? `📄 全部导出 · ${r.messageCount}条` : '📄 全部导出')
+          : '📝 单条导出';
+        const time = new Date(r.receivedAt).toLocaleString('zh-CN');
+        const preview = r.content.replace(/[═╗╝╚║]/g, '').substring(0, 80);
+        const isActive = r.id === selectedRecordId;
+
+        return `
+          <div class="history-item ${isActive ? 'active' : ''}"
+               onclick="selectRecord('${r.id}')"
+               title="点击查看内容">
+            <div class="type-badge ${badgeClass}">${badgeText}</div>
+            <div class="meta">${time}</div>
+            <div class="meta" style="color:#6b7280;">${r.filename}</div>
+            <div class="preview">${escapeHtml(preview)}...</div>
+            <div style="margin-top:8px;display:flex;gap:8px;">
+              <button onclick="event.stopPropagation(); downloadRecord('${r.id}')"
+                      style="font-size:11px;padding:2px 8px;border:1px solid rgba(255,255,255,0.15);border-radius:4px;background:transparent;color:#e0e0e0;cursor:pointer;">
+                💾 下载
+              </button>
+              <button onclick="event.stopPropagation(); deleteRecord('${r.id}')"
+                      style="font-size:11px;padding:2px 8px;border:1px solid rgba(239,68,68,0.3);border-radius:4px;background:transparent;color:#ef4444;cursor:pointer;">
+                🗑 删除
+              </button>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function updateStats() {
+      const records = getHistory();
+      document.getElementById('totalCount').textContent = records.length;
+      document.getElementById('fullCount').textContent =
+        records.filter(r => r.type === 'MEETING_EXPORT').length;
+      document.getElementById('singleCount').textContent =
+        records.filter(r => r.type === 'SINGLE_MESSAGE_EXPORT').length;
+    }
+
+    function selectRecord(id) {
+      selectedRecordId = id;
+      renderHistoryList();
+      const record = getHistory().find(r => r.id === id);
+      if (record) {
+        document.getElementById('modalTitle').textContent = record.filename;
+        document.getElementById('modalContent').textContent = record.content;
+        document.getElementById('modalOverlay').classList.remove('hidden');
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  下载 & 导出
+    // ═══════════════════════════════════════════════════════════
+    function downloadRecord(id) {
+      const record = getHistory().find(r => r.id === id);
+      if (!record) return;
+      triggerDownload(record.content, record.filename);
+    }
+
+    function downloadSelected() {
+      if (!selectedRecordId) {
+        showToast('⚠️ 请先在左侧列表选择一条记录');
+        return;
+      }
+      downloadRecord(selectedRecordId);
+    }
+
+    function downloadCurrentPreview() {
+      const title = document.getElementById('modalTitle').textContent;
+      const content = document.getElementById('modalContent').textContent;
+      triggerDownload(content, title);
+    }
+
+    function exportAllHistory() {
+      const records = getHistory();
+      if (records.length === 0) {
+        showToast('⚠️ 没有可导出的记录');
+        return;
+      }
+
+      const lines = [
+        '═══════════════════════════════════',
+        '  会议小参谋 - 历史记录汇总',
+        `  导出时间: ${new Date().toLocaleString('zh-CN')}`,
+        `  共 ${records.length} 条记录`,
+        '═══════════════════════════════════',
+        '',
+      ];
+
+      records.forEach((r, i) => {
+        lines.push(`--- 记录 #${i + 1} ---`);
+        lines.push(`类型: ${r.type === 'MEETING_EXPORT' ? '全部导出' : '单条导出'}`);
+        lines.push(`接收时间: ${new Date(r.receivedAt).toLocaleString('zh-CN')}`);
+        lines.push(`文件名: ${r.filename}`);
+        if (r.messageCount) lines.push(`消息数: ${r.messageCount}`);
+        lines.push('');
+        lines.push(r.content);
+        lines.push('');
+      });
+
+      triggerDownload(lines.join('\n'), `会议记录汇总_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.txt`);
+      showToast('✅ 历史记录已导出');
+    }
+
+    function clearAllHistory() {
+      if (!confirm('确定要清空所有历史记录吗？此操作不可恢复。')) return;
+      saveHistory([]);
+      selectedRecordId = null;
+      renderHistoryList();
+      updateStats();
+      closeModal();
+      showToast('🗑 历史记录已清空');
+    }
+
+    function triggerDownload(content, filename) {
+      const blob = new Blob(['﻿' + content], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  模态框
+    // ═══════════════════════════════════════════════════════════
+    function closeModal() {
+      document.getElementById('modalOverlay').classList.add('hidden');
+    }
+
+    document.getElementById('modalOverlay').addEventListener('click', function(e) {
+      if (e.target === this) closeModal();
+    });
+
+    // ═══════════════════════════════════════════════════════════
+    //  Toast
+    // ═══════════════════════════════════════════════════════════
+    let toastTimer;
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('show'), 2500);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  postMessage 监听 — 核心集成逻辑
+    // ═══════════════════════════════════════════════════════════
+    window.addEventListener('message', function(event) {
+      // ── 校验来源（生产环境请改为具体 origin） ──
+      // 开发环境用 '*'，生产应校验 event.origin
+      // if (event.origin !== 'https://your-domain.com') return;
+
+      const payload = event.data;
+
+      // ── 校验消息格式 ──
+      if (!payload || payload.source !== 'meeting-assistant') return;
+
+      console.log('[父页面] 收到 postMessage:', payload);
+
+      switch (payload.type) {
+        case 'READY':
+          // iframe 加载完成
+          updateStatus('ready', '会议小参谋已就绪');
+          showToast('✨ 会议小参谋已连接');
+          break;
+
+        case 'MEETING_EXPORT':
+        case 'SINGLE_MESSAGE_EXPORT':
+          // 收到导出的会议记录
+          addRecord(payload);
+          break;
+
+        case 'ERROR':
+          // 错误信息
+          console.error('[父页面] 会议小参谋报错:', payload.data.error);
+          showToast('⚠️ 错误: ' + (payload.data.error || '未知错误'));
+          break;
+
+        default:
+          console.log('[父页面] 未知消息类型:', payload.type);
+      }
+    });
+
+    // ═══════════════════════════════════════════════════════════
+    //  iframe 状态
+    // ═══════════════════════════════════════════════════════════
+    function updateStatus(state, text) {
+      const dot = document.getElementById('statusDot');
+      dot.className = 'status-dot ' + state;
+      document.getElementById('statusText').textContent = text;
+    }
+
+    function reloadIframe() {
+      const url = document.getElementById('iframeUrl').value;
+      document.getElementById('meetingFrame').src = url;
+      updateStatus('disconnected', '重新加载中...');
+    }
+
+    // 页面加载时检查 iframe 是否已加载
+    document.getElementById('meetingFrame').addEventListener('load', function() {
+      // READY 事件由 iframe 内页面主动发送，这里只做兜底
+      console.log('[父页面] iframe onload');
+    });
+
+    // ═══════════════════════════════════════════════════════════
+    //  初始化
+    // ═══════════════════════════════════════════════════════════
+    function init() {
+      renderHistoryList();
+      updateStats();
+
+      // 监听来自 iframe 内的 postMessage（安全：生产环境请校验 origin）
+      console.log('[父页面] 初始化完成，等待会议小参谋就绪...');
+      console.log('[父页面] 支持的协议版本: 1.0');
+      console.log('[父页面] 消息格式: { source: "meeting-assistant", version: "1.0", type: "MEETING_EXPORT" | "SINGLE_MESSAGE_EXPORT" | "READY" | "ERROR", timestamp: number, data: { content?, filename?, messageId?, messageCount?, error? } }');
+    }
+
+    init();
+  </script>
+
+</body>
+</html>
