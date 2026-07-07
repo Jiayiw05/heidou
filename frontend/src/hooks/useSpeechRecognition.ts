@@ -21,6 +21,8 @@ export const useSpeechRecognition = () => {
   const recognitionRef = useRef<any>(null);
   // 累积最近的结果用于去重
   const recentResultsRef = useRef<Set<string>>(new Set());
+  // 记录最后一次错误类型，用于 onend 判断是否重启
+  const lastErrorRef = useRef<string | null>(null);
 
   const SpeechRecognitionAPI =
     (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -36,6 +38,7 @@ export const useSpeechRecognition = () => {
 
     onResultRef.current = onResult;
     recentResultsRef.current = new Set();
+    lastErrorRef.current = null;
 
     try {
       const recognition = new SpeechRecognitionAPI();
@@ -80,13 +83,19 @@ export const useSpeechRecognition = () => {
       };
 
       recognition.onerror = (event: any) => {
-        console.warn('语音识别错误:', event.error);
-        // 'no-speech' 和 'aborted' 是正常的，不算错误
-        if (event.error !== 'no-speech' && event.error !== 'aborted') {
-          setState(prev => ({ ...prev, error: `语音识别错误: ${event.error}` }));
+        const errorType: string = event.error || '';
+        lastErrorRef.current = errorType;
+
+        // 'no-speech' 和 'aborted' 是正常的用户行为，不算错误，静默处理
+        if (errorType === 'no-speech' || errorType === 'aborted') {
+          return; // 不打印日志、不设错误状态、不触发自动重启
         }
-        // 自动重启（Chrome 有时会无故停止）
-        if (event.error === 'network' || event.error === 'service-not-allowed') {
+
+        console.warn('语音识别错误:', errorType);
+        setState(prev => ({ ...prev, error: `语音识别错误: ${errorType}` }));
+
+        // 网络类错误才自动重启
+        if (errorType === 'network' || errorType === 'service-not-allowed') {
           setTimeout(() => {
             try { recognition.start(); } catch {}
           }, 1000);
@@ -94,7 +103,14 @@ export const useSpeechRecognition = () => {
       };
 
       recognition.onend = () => {
-        // 自动重启（continuous 模式下某些浏览器会停止）
+        // no-speech / aborted 是正常的暂停，不需要自动重启
+        const lastError = lastErrorRef.current;
+        if (lastError === 'no-speech' || lastError === 'aborted') {
+          recognitionRef.current = null;
+          setState({ isListening: false, transcript: '', error: null });
+          return;
+        }
+        // 其他情况自动重启（continuous 模式下某些浏览器会停止）
         if (recognitionRef.current === recognition) {
           try {
             recognition.start();
@@ -121,6 +137,7 @@ export const useSpeechRecognition = () => {
       recognitionRef.current.stop();
       recognitionRef.current = null;
       onResultRef.current = null;
+      lastErrorRef.current = null;
       setState({ isListening: false, transcript: '', error: null });
       console.log('浏览器语音识别已停止');
     }
